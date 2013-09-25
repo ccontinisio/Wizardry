@@ -18,6 +18,7 @@ public class Player
 	private GameManager gameMan;
 	private float chargeAmount;
 	private float shieldEnergy = 1f;
+	private float shieldTime;
 
 	//config constants
 	private const float SHIELD_DURATION = 10f;
@@ -104,6 +105,19 @@ public class Player
 		{
 			StartGlow();
 			state = PlayerState.IDLE;
+		}
+	}
+
+	public void StartShield()
+	{
+		if(shieldEnergy > 0f)
+		{
+			state = PlayerState.SHIELDING;
+			isShieldActive = true;
+
+			shieldTime = 3f;
+
+			move.SetLED(SHIELD);
 		}
 	}
 
@@ -296,28 +310,20 @@ public class Player
 	{
 		if(isShieldActive)
 		{
-			if(shieldEnergy > 0f)
+			if(shieldTime > 0f)
 			{
-				shieldEnergy -= Time.deltaTime / SHIELD_DURATION;
-				move.SetLED(SHIELD * shieldEnergy);
+				//deplete shield
+				shieldTime -= Time.deltaTime;
+				shieldEnergy -= Time.deltaTime;
+				move.SetLED(SHIELD * shieldTime);
 			}
-			if(shieldEnergy < 0f)
+			else
 			{
-				shieldEnergy = 0f;
-				SetShield(false);
+				//stop shield
+				isShieldActive = false;
+				state = PlayerState.IDLE;
+				StartGlow();
 			}
-		}
-		else
-		{
-			//Shield recharging
-			/*if(shieldEnergy < 1f)
-			{
-				shieldEnergy += Time.deltaTime / SHIELD_DURATION / 2f;
-			}
-			if(shieldEnergy > 1f)
-			{
-				shieldEnergy = 1f;
-			}*/
 		}
 
 		//blinking routine

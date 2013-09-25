@@ -144,7 +144,7 @@ public class GameManager : Manager
 		if(players[playerId].state == Player.PlayerState.IDLE
 		   || players[playerId].state == Player.PlayerState.SHIELDING)
 		{
-			players[playerId].SetShield(active);
+			players[playerId].StartShield();
 		}
 	}
 
