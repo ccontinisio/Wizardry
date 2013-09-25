@@ -17,11 +17,11 @@ public class Player
 
 	private GameManager gameMan;
 	private float chargeAmount;
-	private float shieldEnergy = 1f;
+	private float shieldEnergy = 10f;
 	private float shieldTime;
 
 	//config constants
-	private const float SHIELD_DURATION = 10f;
+	private const float SHIELD_DURATION = 2f;
 	private const float CHARGE_CAP = 4000f; //total rotation to charge an attack
 
 	//blink control variables
@@ -115,8 +115,8 @@ public class Player
 			state = PlayerState.SHIELDING;
 			isShieldActive = true;
 
-			shieldTime = 3f;
-
+			shieldTime = SHIELD_DURATION;
+			StopGlowing();
 			move.SetLED(SHIELD);
 		}
 	}
@@ -315,11 +315,12 @@ public class Player
 				//deplete shield
 				shieldTime -= Time.deltaTime;
 				shieldEnergy -= Time.deltaTime;
-				move.SetLED(SHIELD * shieldTime);
+				move.SetLED(SHIELD * Mathf.Clamp01(shieldTime));
 			}
 			else
 			{
 				//stop shield
+				Debug.Log("Shield ended");
 				isShieldActive = false;
 				state = PlayerState.IDLE;
 				StartGlow();
