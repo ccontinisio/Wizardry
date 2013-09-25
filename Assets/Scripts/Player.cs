@@ -39,7 +39,10 @@ public class Player
 
 	//accelerometer story
 	private List<Vector3> accelerationStory;
-	private float accStoryLength = 15;
+	private const float ACC_STORY_LENGTH = 15;
+	private bool detectStillPosition;
+	private float STILL_TRESHOLD = 1f; //max different between accelerations in accStory to call it a 'still position'
+	private float ORIENTATION_TRESHOLD = .5f; //max difference of position angle during counters
 
 	//glow control
 	private bool isGlowing;
@@ -153,7 +156,10 @@ public class Player
 		if(chargeAmount >= CHARGE_CAP)
 		{
 			//if the player charged enough
-			gameMan.LaunchAttack(id, targetId);
+			//gameMan.LaunchAttack(id, targetId);
+			state = PlayerState.ATTACKING;
+			detectStillPosition = true;
+			//as soon as the player is still, the attack is unleashed
 		}
 		else
 		{
@@ -166,14 +172,11 @@ public class Player
 
 	public void UnleashAttack(int targetId)
 	{
-		Debug.Log("Attack Unleashed from " + id + " to " + targetId);
-		state = PlayerState.ATTACKING;
 	}
 
 	public void AttemptCounter()
 	{
-		//TODO: insert check for orientation
-		gameMan.CounteredAttack(attackerId, id);
+		detectStillPosition = true;
 	}
 
 	public void CounterTime(int initAttackerId, float orientation)
@@ -189,6 +192,32 @@ public class Player
 		attackerId = initAttackerId;
 		attackerOrientation = orientation;
 		move.SetLED(COLORS[attackerId]);
+	}
+
+	private void PlayerIsStill()
+	{
+		detectStillPosition = false;
+		float yPos = move.Acceleration.y;
+
+		if(state == PlayerState.ATTACKING)
+		{
+			//unleashing attack
+			gameMan.UnleashAttack(id, targetId, yPos);
+			Debug.Log("Attack Unleashed from " + id + " to " + targetId + " yPos: " + yPos);
+		}
+		if(state == PlayerState.COUNTERING)
+		{
+			//attempting defence
+			if(Mathf.Abs(attackerOrientation - yPos) < ORIENTATION_TRESHOLD)
+			{
+				gameMan.CounteredAttack(attackerId, id);
+			}
+			else
+			{
+				gameMan.SuccessfulAttack(attackerId, id);
+			}
+			Debug.Log("Defending " + yPos);
+		}
 	}
 
 	//RESULT FUNCTIONS
@@ -361,6 +390,27 @@ public class Player
 
 		//record last accelerations
 		accelerationStory.Add(move.Acceleration);
-		if(accelerationStory.Count > accStoryLength) { accelerationStory.RemoveAt(0); } //trim the list
+		if(accelerationStory.Count > ACC_STORY_LENGTH) { accelerationStory.RemoveAt(0); } //trim the list
+
+		//try to understand when the user is still (for counters/attacks)
+		if(detectStillPosition)
+		{
+			bool isStill = false;
+			for(int i = accelerationStory.Count-1; i > 1; i--)
+			{
+				if((accelerationStory[i] - accelerationStory[i-1]).sqrMagnitude > STILL_TRESHOLD)
+				{
+					Debug.LogWarning("Not still at pos: " + i + " and acc: " + (accelerationStory[i] - accelerationStory[i-1]).sqrMagnitude);
+					isStill = false;
+					break;
+				}
+				isStill = true;
+			}
+
+			if(isStill)
+			{
+				PlayerIsStill(); //will result in either an attack, or a counter (depending on the state)
+			}
+		}
 	}
 }

@@ -22,7 +22,7 @@ public class GameManager : Manager
 
 	//private variables
 	private List<Player> players;
-	private float secondsToCounter = 2f;
+	private float secondsToCounter = 3f;
 
 	//inspector references
 	public GameObject cylinder;
@@ -74,7 +74,7 @@ public class GameManager : Manager
 	}
 
 	//RESULT ACTIONS (usually assign points)
-	public void LaunchAttack(int playerId, int targetPlayerId)
+	public void UnleashAttack(int playerId, int targetPlayerId, float attackerOrientation)
 	{
 		if(players[targetPlayerId].isShieldActive)
 		{
@@ -94,8 +94,8 @@ public class GameManager : Manager
 			else
 			{
 				//attack unleashed, the target has secondsToCounter second to reply
-				players[playerId].UnleashAttack(targetPlayerId);
-				players[targetPlayerId].CounterTime(playerId, players[playerId].GetAveragedYOrientation());
+				//players[playerId].UnleashAttack(targetPlayerId);
+				players[targetPlayerId].CounterTime(playerId, attackerOrientation);
 				StartCoroutine(StopCounterTime(playerId, targetPlayerId));
 
 			}
@@ -152,7 +152,7 @@ public class GameManager : Manager
 	{
 		if(players[playerId].state == Player.PlayerState.COUNTERING)
 		{
-			players[playerId].AttemptCounter();
+			players[playerId].AttemptCounter(); //will wait for a still position to resolve the countermove
 		}
 	}
 
