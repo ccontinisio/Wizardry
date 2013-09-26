@@ -21,8 +21,8 @@ public class InputManager : Manager
 		{
 			if(mc.GetButtonDown(PSMoveButton.Trigger))
 			{ gameMan.SetPlayerShield(i, true); }
-			/*if(mc.GetButtonUp(PSMoveButton.Trigger))
-			{ gameMan.SetPlayerShield(i, false); }*/
+			if(mc.GetButtonUp(PSMoveButton.Trigger))
+			{ gameMan.SetPlayerShield(i, false); }
 
 			if(mc.GetButtonDown(PSMoveButton.Move))
 			{ gameMan.AttemptCountermove(i); }

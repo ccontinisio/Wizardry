@@ -142,9 +142,9 @@ public class GameManager : Manager
 	public void SetPlayerShield(int playerId, bool active)
 	{
 		if(players[playerId].state == Player.PlayerState.IDLE
-		   || players[playerId].state == Player.PlayerState.SHIELDING)
+			|| players[playerId].state == Player.PlayerState.SHIELDING)
 		{
-			players[playerId].StartShield();
+			players[playerId].SetShield(active);
 		}
 	}
 

@@ -9,8 +9,9 @@ public class Player
 	public int score;
 	public Color defaultColour;
 	public PlayerState state;
-	public bool isShieldActive;
 	public bool isCharging;
+	public bool isShieldActive; //means the shield is up, so the player is invincible
+	private bool isHoldingShield; //means the player is holding the shield button
 	public int targetId = -1;
 	public int attackerId = -1;
 	public float attackerOrientation; //stores the orientation of an attacker, to check if a countermove is successful
@@ -18,7 +19,7 @@ public class Player
 	private GameManager gameMan;
 	private float chargeAmount;
 	private float shieldEnergy = 10f;
-	private float shieldTime;
+	private float shieldFadeTime;
 
 	//config constants
 	private const float SHIELD_DURATION = 2f;
@@ -84,16 +85,17 @@ public class Player
 	//PLAYER ACTIONS
 	public void SetShield(bool active)
 	{
-		isShieldActive = active;
-
 		if(active)
 		{
 			if(shieldEnergy > 0f)
 			{
-				move.SetLED(SHIELD * shieldEnergy);
-				StopGlowing();
-				StopBlinking();
 				state = PlayerState.SHIELDING;
+				isShieldActive = active;
+				isHoldingShield = true;
+
+				shieldFadeTime = SHIELD_DURATION;
+				StopGlowing();
+				move.SetLED(SHIELD * Mathf.Clamp01(shieldEnergy));
 			}
 			else
 			{
@@ -103,22 +105,17 @@ public class Player
 		}
 		else
 		{
-			StartGlow();
-			state = PlayerState.IDLE;
+			isHoldingShield = false;
 		}
 	}
 
-	public void StartShield()
+	private void StopShielding()
 	{
-		if(shieldEnergy > 0f)
-		{
-			state = PlayerState.SHIELDING;
-			isShieldActive = true;
-
-			shieldTime = SHIELD_DURATION;
-			StopGlowing();
-			move.SetLED(SHIELD);
-		}
+		Debug.Log("Shield ended");
+		isShieldActive = false;
+		isHoldingShield = false;
+		state = PlayerState.IDLE;
+		StartGlow();
 	}
 
 	public void StartChargingAttack(int intendedTargetId)
@@ -310,20 +307,29 @@ public class Player
 	{
 		if(isShieldActive)
 		{
-			if(shieldTime > 0f)
+			//deplete shield
+			shieldEnergy -= Time.deltaTime;
+
+			if(isHoldingShield)
 			{
-				//deplete shield
-				shieldTime -= Time.deltaTime;
-				shieldEnergy -= Time.deltaTime;
-				move.SetLED(SHIELD * Mathf.Clamp01(shieldTime));
+				if(shieldEnergy < 0f)
+				{
+					StopShielding();
+				}
 			}
 			else
 			{
-				//stop shield
-				Debug.Log("Shield ended");
-				isShieldActive = false;
-				state = PlayerState.IDLE;
-				StartGlow();
+				shieldFadeTime -= Time.deltaTime;
+
+				if(shieldFadeTime > 0f)
+				{
+					move.SetLED(SHIELD * Mathf.Clamp01(shieldFadeTime));
+				}
+				else
+				{
+					//stop shield
+					StopShielding();
+				}
 			}
 		}
 
