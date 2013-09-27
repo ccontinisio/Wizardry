@@ -164,7 +164,7 @@ public class GameManager : Manager
 	{
 		//Debug.Log(playerId + " to " + targetId);
 		if(playerId != targetId
-		   && players[playerId].state != Player.PlayerState.CHARGING)
+		   && players[playerId].state == Player.PlayerState.IDLE)
 		{
 			players[playerId].StartChargingAttack(targetId);
 		}
