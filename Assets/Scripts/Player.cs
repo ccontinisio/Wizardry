@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -30,6 +31,8 @@ public class Player
 	private float startBlinkTime;
 	private float stopBlinkTime;
 	private float blinkFrequency;
+	private bool isRainbowBlinking;
+	private int currentRainbowColour;
 
 	//vibration control variables
 	private bool isVibrating;
@@ -58,6 +61,7 @@ public class Player
 	public static Color BROKEN_SHIELD = new Color(.2f, .2f, .2f);
 	public static Color BLACK = Color.black;
 	public static List<Color> COLORS = new List<Color>{PINK, GREEN, RED, CYAN};
+	public static Color[] RAINBOW_COLORS = new Color[]{Color.red, Color.yellow, Color.green, Color.blue, Color.magenta, Color.white};
 
 	//states
 	public enum PlayerState
@@ -66,7 +70,9 @@ public class Player
 		SHIELDING,
 		CHARGING,
 		ATTACKING,
-		COUNTERING
+		COUNTERING,
+		SUCCESSFUL_ATTACK,
+		HIT_COOLDOWN
 	}
 
 	public Player(int initId, UniMoveController initMove, GameManager gameManReference)
@@ -136,13 +142,13 @@ public class Player
 			chargeAmount += amount;
 			float multiplier = chargeAmount / CHARGE_CAP;
 			move.SetLED(COLORS[targetId] * multiplier);
-			move.SetRumble(.1f + multiplier * .4f);
+			move.SetRumble(multiplier * .3f);
 
 			if(chargeAmount >= CHARGE_CAP)
 			{
 				chargeAmount = CHARGE_CAP;
 				StartBlinking(10f, .5f, COLORS[targetId]);
-				move.SetRumble(1f);
+				move.SetRumble(.3f);
 			}
 		}
 		else
@@ -170,21 +176,21 @@ public class Player
 		chargeAmount = 0f;
 	}
 
-	public void UnleashAttack(int targetId)
-	{
-	}
-
+	//when pressing the Move button during a counter time
 	public void AttemptCounter()
 	{
 		detectStillPosition = true;
 	}
 
+	//forced on the player when somebody attacks him
 	public void CounterTime(int initAttackerId, float orientation)
 	{
 		Debug.Log("Suffering attack from " + initAttackerId + " oriented " + orientation);
 		StopChargingAttack();
 		StopBlinking();
 		StopGlowing();
+
+		StartVibration(.5f, .5f); //warning vibration
 
 		//at this point, the user is unable to do anything but counter
 		//the gameMan will call SufferAttack to release him and award the attacker if he doesn't counter in time
@@ -194,6 +200,7 @@ public class Player
 		move.SetLED(COLORS[attackerId]);
 	}
 
+	//stillness detected
 	private void PlayerIsStill()
 	{
 		detectStillPosition = false;
@@ -220,20 +227,29 @@ public class Player
 		}
 	}
 
-	//RESULT FUNCTIONS
-	public void SuccessfulAttack(int pId)
+	//called from a coroutine when the player deals a successful attack, or when he takes a hit
+	public void BackToIdle()
 	{
-		StartBlinking(2f, .1f, COLORS[pId]);
+		isRainbowBlinking = false;
+
+		StartGlow();
+		state = PlayerState.IDLE;
+	}
+
+	//RESULT FUNCTIONS
+	public void SuccessfulAttack(int targetId)
+	{
+		state = PlayerState.SUCCESSFUL_ATTACK;
+		StartRainbowBlinking(3f);
 		StartVibration(2f, 1f);
 		state = PlayerState.IDLE;
 	}
 
 	public void SufferAttack(int attackerId)
 	{
+		state = PlayerState.HIT_COOLDOWN;
 		StopGlowing();
-		StartBlinking(2f, .1f, COLORS[attackerId]);
-		StartVibration(2f, 1f);
-		state = PlayerState.IDLE;
+		StartBlinking(2f, 1f, Color.black, Color.black);
 	}
 
 	public void AttackBlocked(int attackerId)
@@ -275,6 +291,19 @@ public class Player
 		altBlinkColor = initAltColor;
 
 		isBlinking = true;
+	}
+
+	public void StartRainbowBlinking(float duration)
+	{
+		StopGlowing();
+		StopBlinking();
+
+		startBlinkTime = Time.time;
+		stopBlinkTime = startBlinkTime + duration;
+		blinkFrequency = .1f;
+
+		isRainbowBlinking = true;
+		currentRainbowColour = 0;
 	}
 
 	public void StopBlinking()
@@ -367,6 +396,28 @@ public class Player
 			{
 				StopBlinking();
 				StartGlow();
+			}
+		}
+
+		//rainbow routine
+		if(isRainbowBlinking)
+		{
+			if(Time.time <= stopBlinkTime)
+			{
+				if((Time.time - startBlinkTime)%blinkFrequency <= blinkFrequency)
+				{
+					move.SetLED(RAINBOW_COLORS[currentRainbowColour]);
+					
+					currentRainbowColour++;
+					if(currentRainbowColour == RAINBOW_COLORS.Length)
+					{
+						currentRainbowColour = 0;
+					}
+				}
+			}
+			else
+			{
+				BackToIdle();
 			}
 		}
 

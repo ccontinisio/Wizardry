@@ -24,9 +24,6 @@ public class GameManager : Manager
 	private List<Player> players;
 	private float secondsToCounter = 3f;
 
-	//inspector references
-	public GameObject cylinder;
-
 	private void Start()
 	{
 		moveMan.Init();
@@ -46,10 +43,6 @@ public class GameManager : Manager
 		foreach(Player p in players)
 		{
 			p.Update();
-			if(p.id == 0)
-			{
-				cylinder.transform.forward = p.GetAveragedAcceleration();
-			}
 		}
 	}
 
@@ -102,6 +95,7 @@ public class GameManager : Manager
 		}
 	}
 
+	//ends the period that the defender has to counter
 	private IEnumerator StopCounterTime(int attackerId, int defenderId)
 	{
 		Debug.Log("Start coroutine");
@@ -115,6 +109,14 @@ public class GameManager : Manager
 		}
 	}
 
+	private IEnumerator StopCelebrations(int attackerId, int defenderId)
+	{
+		yield return new WaitForSeconds(3f);
+
+		players[attackerId].BackToIdle();
+		players[defenderId].BackToIdle();
+	}
+
 	//in case the target doesn't counter in time, or counters wrong
 	public void SuccessfulAttack(int attackerId, int targetId)
 	{
@@ -122,6 +124,8 @@ public class GameManager : Manager
 		players[targetId].score += SUFFER_ATTACK;
 		players[attackerId].SuccessfulAttack(targetId);
 		players[targetId].SufferAttack(attackerId);
+
+		StartCoroutine(StopCelebrations(attackerId, targetId));
 	}
 
 	public void BreakAttack(int playerId)
