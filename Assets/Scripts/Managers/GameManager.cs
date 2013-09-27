@@ -22,10 +22,7 @@ public class GameManager : Manager
 
 	//private variables
 	private List<Player> players;
-	private float secondsToCounter = 2f;
-
-	//inspector references
-	public GameObject cylinder;
+	private float secondsToCounter = 3f;
 
 	private void Start()
 	{
@@ -46,10 +43,6 @@ public class GameManager : Manager
 		foreach(Player p in players)
 		{
 			p.Update();
-			if(p.id == 0)
-			{
-				cylinder.transform.forward = p.GetAveragedAcceleration();
-			}
 		}
 	}
 
@@ -74,7 +67,7 @@ public class GameManager : Manager
 	}
 
 	//RESULT ACTIONS (usually assign points)
-	public void LaunchAttack(int playerId, int targetPlayerId)
+	public void UnleashAttack(int playerId, int targetPlayerId, float attackerOrientation)
 	{
 		if(players[targetPlayerId].isShieldActive)
 		{
@@ -94,14 +87,15 @@ public class GameManager : Manager
 			else
 			{
 				//attack unleashed, the target has secondsToCounter second to reply
-				players[playerId].UnleashAttack(targetPlayerId);
-				players[targetPlayerId].CounterTime(playerId, players[playerId].GetAveragedYOrientation());
+				//players[playerId].UnleashAttack(targetPlayerId);
+				players[targetPlayerId].CounterTime(playerId, attackerOrientation);
 				StartCoroutine(StopCounterTime(playerId, targetPlayerId));
 
 			}
 		}
 	}
 
+	//ends the period that the defender has to counter
 	private IEnumerator StopCounterTime(int attackerId, int defenderId)
 	{
 		Debug.Log("Start coroutine");
@@ -115,6 +109,14 @@ public class GameManager : Manager
 		}
 	}
 
+	private IEnumerator StopCelebrations(int attackerId, int defenderId)
+	{
+		yield return new WaitForSeconds(3f);
+
+		players[attackerId].BackToIdle();
+		players[defenderId].BackToIdle();
+	}
+
 	//in case the target doesn't counter in time, or counters wrong
 	public void SuccessfulAttack(int attackerId, int targetId)
 	{
@@ -122,6 +124,8 @@ public class GameManager : Manager
 		players[targetId].score += SUFFER_ATTACK;
 		players[attackerId].SuccessfulAttack(targetId);
 		players[targetId].SufferAttack(attackerId);
+
+		StartCoroutine(StopCelebrations(attackerId, targetId));
 	}
 
 	public void BreakAttack(int playerId)
@@ -152,7 +156,7 @@ public class GameManager : Manager
 	{
 		if(players[playerId].state == Player.PlayerState.COUNTERING)
 		{
-			players[playerId].AttemptCounter();
+			players[playerId].AttemptCounter(); //will wait for a still position to resolve the countermove
 		}
 	}
 

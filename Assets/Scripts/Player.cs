@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -32,6 +33,8 @@ public class Player
 	private float startBlinkTime;
 	private float stopBlinkTime;
 	private float blinkFrequency;
+	private bool isRainbowBlinking;
+	private int currentRainbowColour;
 
 	//vibration control variables
 	private bool isVibrating;
@@ -41,7 +44,10 @@ public class Player
 
 	//accelerometer story
 	private List<Vector3> accelerationStory;
-	private float accStoryLength = 15;
+	private const float ACC_STORY_LENGTH = 15;
+	private bool detectStillPosition;
+	private float STILL_TRESHOLD = 1f; //max different between accelerations in accStory to call it a 'still position'
+	private float ORIENTATION_TRESHOLD = .5f; //max difference of position angle during counters
 
 	//glow control
 	private bool isGlowing;
@@ -57,6 +63,7 @@ public class Player
 	public static Color BROKEN_SHIELD = new Color(.2f, .2f, .2f);
 	public static Color BLACK = Color.black;
 	public static List<Color> COLORS = new List<Color>{PINK, GREEN, RED, CYAN};
+	public static Color[] RAINBOW_COLORS = new Color[]{Color.red, Color.yellow, Color.green, Color.blue, Color.magenta, Color.white};
 
 	//states
 	public enum PlayerState
@@ -65,7 +72,9 @@ public class Player
 		SHIELDING,
 		CHARGING,
 		ATTACKING,
-		COUNTERING
+		COUNTERING,
+		SUCCESSFUL_ATTACK,
+		HIT_COOLDOWN
 	}
 
 	public Player(int initId, UniMoveController initMove, GameManager gameManReference)
@@ -144,13 +153,13 @@ public class Player
 			chargeAmount += amount;
 			float multiplier = chargeAmount / CHARGE_CAP;
 			move.SetLED(COLORS[targetId] * multiplier);
-			move.SetRumble(.1f + multiplier * .4f);
+			move.SetRumble(multiplier * .3f);
 
 			if(chargeAmount >= CHARGE_CAP)
 			{
 				chargeAmount = CHARGE_CAP;
 				StartBlinking(10f, .5f, COLORS[targetId]);
-				move.SetRumble(1f);
+				move.SetRumble(.3f);
 			}
 		}
 		else
@@ -164,7 +173,10 @@ public class Player
 		if(chargeAmount >= CHARGE_CAP)
 		{
 			//if the player charged enough
-			gameMan.LaunchAttack(id, targetId);
+			//gameMan.LaunchAttack(id, targetId);
+			state = PlayerState.ATTACKING;
+			detectStillPosition = true;
+			//as soon as the player is still, the attack is unleashed
 		}
 		else
 		{
@@ -175,24 +187,21 @@ public class Player
 		chargeAmount = 0f;
 	}
 
-	public void UnleashAttack(int targetId)
-	{
-		Debug.Log("Attack Unleashed from " + id + " to " + targetId);
-		state = PlayerState.ATTACKING;
-	}
-
+	//when pressing the Move button during a counter time
 	public void AttemptCounter()
 	{
-		//TODO: insert check for orientation
-		gameMan.CounteredAttack(attackerId, id);
+		detectStillPosition = true;
 	}
 
+	//forced on the player when somebody attacks him
 	public void CounterTime(int initAttackerId, float orientation)
 	{
 		Debug.Log("Suffering attack from " + initAttackerId + " oriented " + orientation);
 		StopChargingAttack();
 		StopBlinking();
 		StopGlowing();
+
+		StartVibration(.5f, .5f); //warning vibration
 
 		//at this point, the user is unable to do anything but counter
 		//the gameMan will call SufferAttack to release him and award the attacker if he doesn't counter in time
@@ -202,20 +211,56 @@ public class Player
 		move.SetLED(COLORS[attackerId]);
 	}
 
-	//RESULT FUNCTIONS
-	public void SuccessfulAttack(int pId)
+	//stillness detected
+	private void PlayerIsStill()
 	{
-		StartBlinking(2f, .1f, COLORS[pId]);
+		detectStillPosition = false;
+		float yPos = move.Acceleration.y;
+
+		if(state == PlayerState.ATTACKING)
+		{
+			//unleashing attack
+			gameMan.UnleashAttack(id, targetId, yPos);
+			Debug.Log("Attack Unleashed from " + id + " to " + targetId + " yPos: " + yPos);
+		}
+		if(state == PlayerState.COUNTERING)
+		{
+			//attempting defence
+			if(Mathf.Abs(attackerOrientation - yPos) < ORIENTATION_TRESHOLD)
+			{
+				gameMan.CounteredAttack(attackerId, id);
+			}
+			else
+			{
+				gameMan.SuccessfulAttack(attackerId, id);
+			}
+			Debug.Log("Defending " + yPos);
+		}
+	}
+
+	//called from a coroutine when the player deals a successful attack, or when he takes a hit
+	public void BackToIdle()
+	{
+		isRainbowBlinking = false;
+
+		StartGlow();
+		state = PlayerState.IDLE;
+	}
+
+	//RESULT FUNCTIONS
+	public void SuccessfulAttack(int targetId)
+	{
+		state = PlayerState.SUCCESSFUL_ATTACK;
+		StartRainbowBlinking(3f);
 		StartVibration(2f, 1f);
 		state = PlayerState.IDLE;
 	}
 
 	public void SufferAttack(int attackerId)
 	{
+		state = PlayerState.HIT_COOLDOWN;
 		StopGlowing();
-		StartBlinking(2f, .1f, COLORS[attackerId]);
-		StartVibration(2f, 1f);
-		state = PlayerState.IDLE;
+		StartBlinking(2f, 1f, Color.black, Color.black);
 	}
 
 	public void AttackBlocked(int attackerId)
@@ -257,6 +302,19 @@ public class Player
 		altBlinkColor = initAltColor;
 
 		isBlinking = true;
+	}
+
+	public void StartRainbowBlinking(float duration)
+	{
+		StopGlowing();
+		StopBlinking();
+
+		startBlinkTime = Time.time;
+		stopBlinkTime = startBlinkTime + duration;
+		blinkFrequency = .1f;
+
+		isRainbowBlinking = true;
+		currentRainbowColour = 0;
 	}
 
 	public void StopBlinking()
@@ -354,6 +412,28 @@ public class Player
 			}
 		}
 
+		//rainbow routine
+		if(isRainbowBlinking)
+		{
+			if(Time.time <= stopBlinkTime)
+			{
+				if((Time.time - startBlinkTime)%blinkFrequency <= blinkFrequency)
+				{
+					move.SetLED(RAINBOW_COLORS[currentRainbowColour]);
+					
+					currentRainbowColour++;
+					if(currentRainbowColour == RAINBOW_COLORS.Length)
+					{
+						currentRainbowColour = 0;
+					}
+				}
+			}
+			else
+			{
+				BackToIdle();
+			}
+		}
+
 		//vibration routine
 		if(isVibrating)
 		{
@@ -374,6 +454,27 @@ public class Player
 
 		//record last accelerations
 		accelerationStory.Add(move.Acceleration);
-		if(accelerationStory.Count > accStoryLength) { accelerationStory.RemoveAt(0); } //trim the list
+		if(accelerationStory.Count > ACC_STORY_LENGTH) { accelerationStory.RemoveAt(0); } //trim the list
+
+		//try to understand when the user is still (for counters/attacks)
+		if(detectStillPosition)
+		{
+			bool isStill = false;
+			for(int i = accelerationStory.Count-1; i > 1; i--)
+			{
+				if((accelerationStory[i] - accelerationStory[i-1]).sqrMagnitude > STILL_TRESHOLD)
+				{
+					Debug.LogWarning("Not still at pos: " + i + " and acc: " + (accelerationStory[i] - accelerationStory[i-1]).sqrMagnitude);
+					isStill = false;
+					break;
+				}
+				isStill = true;
+			}
+
+			if(isStill)
+			{
+				PlayerIsStill(); //will result in either an attack, or a counter (depending on the state)
+			}
+		}
 	}
 }
