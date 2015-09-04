@@ -447,7 +447,7 @@ public class Player
 		//glowing routine
 		if(isGlowing)
 		{
-			float multiplier = (Mathf.Abs(Mathf.Sin(Time.time*glowPeriod)) * .05f) + .01f;
+			float multiplier = (Mathf.Abs(Mathf.Sin(Time.time*glowPeriod)) * .05f) + .03f;
 			Color desiredColor = defaultColour * multiplier;
 			move.SetLED(desiredColor);
 		}
